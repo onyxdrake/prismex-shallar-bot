@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
 // ========== KONFIGURASI ==========
-const TELEGRAM_TOKEN = 'GANTI_DENGAN_TOKEN_BOT_LO';
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || '';
 const SERVER_URL = 'https://prismex-shallar-server-production.up.railway.app';
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
@@ -10,12 +10,11 @@ const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 // ========== COMMAND /start ==========
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    const text = `👋 Selamat datang di Prismex-Shallar!\n\n` +
+    const text = `👋 Selamat datang di Prismex!\n\n` +
         `Perintah yang tersedia:\n` +
         `/daftar - Buat akun\n` +
         `/saldo - Cek saldo\n` +
-        `/transfer <user_id> <jumlah> - Kirim PRX/SHL\n` +
-        `/harga - Lihat harga emas terbaru\n` +
+        `/transfer <user_id> <jumlah> - Kirim PRX\n` +
         `/daftaroperator - Jadi operator`;
     bot.sendMessage(chatId, text);
 });
@@ -89,4 +88,4 @@ bot.onText(/\/daftaroperator/, (msg) => {
     bot.sendMessage(chatId, '📝 Untuk daftar operator, kirim data:\n\nNama/ID:\nPerangkat:\nRAM:\nInternet:\nLama nyala/hari:\nWallet address:');
 });
 
-console.log('🤖 Bot Telegram Prismex-Shallar jalan...');
+console.log('🤖 Bot Telegram Prismex jalan...');
