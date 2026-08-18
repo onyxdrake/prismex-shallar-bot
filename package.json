@@ -1,12 +1,17 @@
 {
-  "name": "prismex-shallar-bot",
-  "version": "1.0.0",
+  "name": "prismex-bot",
+  "version": "2.0.0",
+  "description": "Prismex Digital Gold Currency - Telegram Bot",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.66.0",
-    "axios": "^1.7.0"
+    "axios": "^1.7.0",
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
