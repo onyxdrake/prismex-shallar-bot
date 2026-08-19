@@ -1,6 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const crypto = require('crypto');
 
 if (!process.env.TELEGRAM_TOKEN) throw new Error('TELEGRAM_TOKEN wajib diisi');
 if (!process.env.SERVER_URL) throw new Error('SERVER_URL wajib diisi');
@@ -10,6 +9,7 @@ const SERVER_URL = process.env.SERVER_URL;
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 const sessions = new Map();
+const operatorSessions = new Map();
 
 function helpText() {
     return `🏦 PRISMEX DIGITAL GOLD BANK\n\n` +
@@ -42,7 +42,7 @@ bot.onText(/\/help/, (msg) => {
     bot.sendMessage(msg.chat.id, helpText());
 });
 
-// ========== REGISTER ==========
+// ========== REGISTER USER ==========
 bot.onText(/\/register/, (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, '📝 Send your secret password (min 8 characters):');
@@ -72,7 +72,7 @@ bot.onText(/\/register/, (msg) => {
     });
 });
 
-// ========== LOGIN ==========
+// ========== LOGIN USER ==========
 bot.onText(/\/login/, (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, '🔑 Send your secret password:');
@@ -251,9 +251,118 @@ bot.onText(/\/merchant/, (msg) => {
     bot.sendMessage(msg.chat.id, `🏪 Merchant Registration\n\nSend:\nName:\nBusiness type:\nCity:`);
 });
 
-// ========== OPERATOR ==========
+// ========== OPERATOR REGISTRATION FLOW ==========
 bot.onText(/\/operator/, (msg) => {
-    bot.sendMessage(msg.chat.id, `🖥️ Operator Registration\n\nSend:\nName/ID:\nDevice:\nRAM:\nInternet speed:\nOnline hours/day:\nWallet address:`);
+    const chatId = msg.chat.id;
+    operatorSessions.set(chatId, { step: 1 });
+    bot.sendMessage(chatId, '🖥️ Operator Registration\n\nStep 1: Send your Name/ID:');
 });
+
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+
+    if (!operatorSessions.has(chatId)) return;
+    if (text.startsWith('/')) return;
+
+    const session = operatorSessions.get(chatId);
+
+    switch (session.step) {
+        case 1:
+            session.name = text;
+            session.step = 2;
+            bot.sendMessage(chatId, 'Step 2: Device (HP/Laptop/PC):');
+            break;
+
+        case 2:
+            session.device = text;
+            session.step = 3;
+            bot.sendMessage(chatId, 'Step 3: RAM (GB):');
+            break;
+
+        case 3:
+            session.ram = text;
+            session.step = 4;
+            bot.sendMessage(chatId, 'Step 4: Internet speed (ping/Mbps):');
+            break;
+
+        case 4:
+            session.internet = text;
+            session.step = 5;
+            bot.sendMessage(chatId, 'Step 5: Online hours/day:');
+            break;
+
+        case 5:
+            session.hours = text;
+            session.step = 6;
+            bot.sendMessage(chatId, 'Step 6: Wallet address (0x...):');
+            break;
+
+        case 6:
+            session.wallet = text;
+            session.step = 7;
+            bot.sendMessage(chatId, 'Step 7: Mau handle berapa region?\n\n1. Satu region\n2. Semua region (backup)\n\nKetik 1 atau 2:');
+            break;
+
+        case 7:
+            const choice = parseInt(text);
+            if (choice === 1) {
+                session.step = 8;
+                bot.sendMessage(chatId, 'Pilih region:\n\nASIA\nUS\nEUROPE\nSOUTH_AMERICA\nMIDDLE_EAST');
+            } else if (choice === 2) {
+                session.region = 'ALL';
+                session.protocol = 'BOTH';
+                await submitOperator(chatId, session);
+            } else {
+                bot.sendMessage(chatId, 'Ketik 1 atau 2.');
+            }
+            break;
+
+        case 8:
+            const region = text.toUpperCase();
+            const validRegions = ['ASIA', 'US', 'EUROPE', 'SOUTH_AMERICA', 'MIDDLE_EAST'];
+            if (!validRegions.includes(region)) {
+                bot.sendMessage(chatId, 'Region tidak valid. Pilih: ASIA, US, EUROPE, SOUTH_AMERICA, MIDDLE_EAST');
+                return;
+            }
+            session.region = region;
+            await submitOperator(chatId, session);
+            break;
+    }
+});
+
+async function submitOperator(chatId, session) {
+    const operatorId = `op-${chatId}-${Date.now()}`;
+    const protocol = session.region === 'ALL' ? 'BOTH' : (session.region === 'ASIA' || session.region === 'US' ? 'PRX' : 'SHL');
+
+    try {
+        const res = await axios.post(`${SERVER_URL}/api/operator/register`, {
+            operator_id: operatorId,
+            protocol,
+            region: session.region,
+            wallet_address: session.wallet
+        });
+
+        if (res.data.success) {
+            bot.sendMessage(chatId, `✅ Pendaftaran operator berhasil!\n\n` +
+                `ID: ${operatorId}\n` +
+                `Nama: ${session.name}\n` +
+                `Device: ${session.device}\n` +
+                `RAM: ${session.ram} GB\n` +
+                `Internet: ${session.internet}\n` +
+                `Online: ${session.hours}/day\n` +
+                `Wallet: ${session.wallet}\n` +
+                `Region: ${session.region}\n` +
+                `Protocol: ${protocol}\n\n` +
+                `Status: PENDING (menunggu aktivasi admin)`);
+        } else {
+            bot.sendMessage(chatId, `❌ Gagal: ${res.data.error}`);
+        }
+    } catch (err) {
+        bot.sendMessage(chatId, '❌ Pendaftaran operator gagal. Coba lagi nanti.');
+    }
+
+    operatorSessions.delete(chatId);
+}
 
 console.log('🤖 Prismex Digital Gold Bank Bot running...');
